@@ -12,6 +12,7 @@
 #define SIMULATOR_USER1_SECRET_ADDR                 0x3000
 #define SIMULATOR_USER2_SECRET_ADDR                 0x4000
 #define SIMULATOR_USER3_SECRET_ADDR                 0x5000
+#define SIMULATOR_DURESS_SECRET_ADDR                0x6000
 
 typedef int32_t (*OperateStorageDataFunc)(uint32_t addr, uint8_t *buffer, uint32_t size);
 
@@ -62,6 +63,7 @@ SimulatorFlashPath g_simulatorPathMap[] = {
 
     {DS28S60_DATA_ADDR, PC_SIMULATOR_PATH "/ds28s60.json", StorageGetData, StorageSetData},
     {ATECC608B_DATA_ADDR, PC_SIMULATOR_PATH "/atecc608b.json", StorageGetData, StorageSetData},
+    {SIMULATOR_DURESS_SECRET_ADDR, PC_SIMULATOR_PATH "/duress_secret.json", StorageGetData, StorageSetData},
 };
 
 const char *FindSimulatorFlashPath(uint32_t addr)
@@ -351,6 +353,63 @@ int32_t SimulatorVerifyCurrentPassword(uint8_t accountIndex, const char *passwor
     cJSON_Delete(rootJson);
 
     return ERR_KEYSTORE_PASSWORD_ERR;
+}
+
+int32_t SimulatorSetDuressPassword(const char *password)
+{
+    cJSON *rootJson = cJSON_CreateObject();
+    cJSON_AddItemToObject(rootJson, "password", cJSON_CreateString(password));
+    char *jsonBuf = cJSON_PrintBuffered(rootJson, BUFFER_SIZE_1024, false);
+    OperateStorageDataFunc func = FindSimulatorStorageFunc(SIMULATOR_DURESS_SECRET_ADDR, false);
+    if (func) {
+        func(SIMULATOR_DURESS_SECRET_ADDR, (uint8_t *)jsonBuf, strlen(jsonBuf));
+    }
+    cJSON_Delete(rootJson);
+    return SUCCESS_CODE;
+}
+
+int32_t SimulatorClearDuressPassword(void)
+{
+    OperateStorageDataFunc func = FindSimulatorStorageFunc(SIMULATOR_DURESS_SECRET_ADDR, false);
+    if (func) {
+        uint8_t empty[] = "{}";
+        func(SIMULATOR_DURESS_SECRET_ADDR, empty, 2);
+    }
+    return SUCCESS_CODE;
+}
+
+bool SimulatorIsDuressPasswordMatch(const char *password)
+{
+    uint8_t buffer[JSON_MAX_LEN] = {0};
+    OperateStorageDataFunc func = FindSimulatorStorageFunc(SIMULATOR_DURESS_SECRET_ADDR, true);
+    if (func) {
+        func(SIMULATOR_DURESS_SECRET_ADDR, buffer, JSON_MAX_LEN);
+    }
+    cJSON *rootJson = cJSON_Parse((char *)buffer);
+    if (rootJson == NULL) {
+        return false;
+    }
+    cJSON *item = cJSON_GetObjectItem(rootJson, "password");
+    bool match = (item != NULL && strcmp(item->valuestring, password) == 0);
+    cJSON_Delete(rootJson);
+    return match;
+}
+
+bool SimulatorIsDuressPasswordSet(void)
+{
+    uint8_t buffer[JSON_MAX_LEN] = {0};
+    OperateStorageDataFunc func = FindSimulatorStorageFunc(SIMULATOR_DURESS_SECRET_ADDR, true);
+    if (func) {
+        func(SIMULATOR_DURESS_SECRET_ADDR, buffer, JSON_MAX_LEN);
+    }
+    cJSON *rootJson = cJSON_Parse((char *)buffer);
+    if (rootJson == NULL) {
+        return false;
+    }
+    cJSON *item = cJSON_GetObjectItem(rootJson, "password");
+    bool isSet = (item != NULL && strlen(item->valuestring) > 0);
+    cJSON_Delete(rootJson);
+    return isSet;
 }
 
 // 28S60
