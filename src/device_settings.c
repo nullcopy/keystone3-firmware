@@ -25,6 +25,7 @@
 #include "log_print.h"
 #ifdef COMPILE_SIMULATOR
 #include "simulator_model.h"
+#include "simulator_storage.h"
 #endif
 
 #define VERSION_MAX_LENGTH      32
@@ -475,10 +476,14 @@ void WipeDevice(void)
     DestroyAccount(1);
     DestroyAccount(2);
     ClearDuressPassword();
+#ifdef COMPILE_SIMULATOR
+    SimulatorWipeDevice();
+#else
     for (uint32_t addr = 0; addr < GD25QXX_FLASH_SIZE; addr += 1024 * 64) {
         Gd25FlashBlockErase(addr);
         printf("flash erase address: %#x\n", addr);
     }
+#endif
 }
 
 /// @brief Device settings test.

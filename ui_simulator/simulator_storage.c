@@ -69,7 +69,15 @@ SimulatorFlashPath g_simulatorPathMap[] = {
 void SimulatorWipeDevice(void)
 {
     for (int i = 0; i < sizeof(g_simulatorPathMap) / sizeof(g_simulatorPathMap[0]); i++) {
-        remove(g_simulatorPathMap[i].path);
+        // g_simulatorPathMap paths are LVGL virtual paths like "C:/assets/foo.json".
+        // Strip the "C:" drive prefix to get the real path relative to LV_FS_STDIO_PATH.
+        const char *vpath = g_simulatorPathMap[i].path;
+        if (vpath[0] != '\0' && vpath[1] == ':') {
+            vpath += 2;  // skip "C:"
+        }
+        char realpath[256];
+        snprintf(realpath, sizeof(realpath), LV_FS_STDIO_PATH "%s", vpath);
+        remove(realpath);
     }
 }
 
