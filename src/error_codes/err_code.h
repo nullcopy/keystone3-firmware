@@ -89,6 +89,8 @@ typedef enum {
 
     ERR_ZCASH_INVALID_ACCOUNT_INDEX,
 
+    ERR_KEYSTORE_DURESS_PASSWORD_CONFLICT,
+
     ERR_END,
 } Error_Code;
 

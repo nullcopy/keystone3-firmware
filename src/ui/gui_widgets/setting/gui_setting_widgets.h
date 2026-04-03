@@ -41,6 +41,11 @@ typedef enum {
     DEVICE_SETTING_RESET_PASSCODE_REPEATPASS,
     DEVICE_SETTING_RESET_PASSCODE_CONFIRM,
 
+    // DURESS PIN
+    DEVICE_SETTING_DURESS_PIN,
+    DEVICE_SETTING_DURESS_PIN_VERIFY,
+    DEVICE_SETTING_DURESS_PIN_SETPIN,
+
     // PASSPHRASE
     DEVICE_SETTING_PASSPHRASE,
     DEVICE_SETTING_PASSPHRASE_VERIFY,
@@ -118,6 +123,7 @@ void GuiSettingRecoveryCheck(void);
 void CloseToSubtopViewHandler(lv_event_t *e);
 
 void GuiVerifyCurrentPasswordErrorCount(void *param);
+struct GuiEnterPasscodeItem *GuiSettingGetVerifyCode(void);
 
 // wallet setting
 void GuiSettingDestruct(void *obj, void *param);
@@ -163,6 +169,17 @@ void FingerSignHandler(lv_event_t *e);
 void GuiFingerManagerDestruct(void *obj, void *param);
 void GuiFpVerifyDestruct(void);
 void GuiWalletFingerOpenSign(void);
+// duress pin
+void GuiDuressPinSetPinWidget(lv_obj_t *parent, uint8_t tile);
+void GuiDuressPinRepeatPinWidget(lv_obj_t *parent);
+void GuiDuressPinSetPinPass(const char *buf);
+void GuiDuressPinRepeatPinPass(const char *buf);
+void GuiSetDuressPinDestruct(void *obj, void *param);
+void GuiRepeatDuressPinDestruct(void *obj, void *param);
+void GuiSetDuressPasswordSuccess(void);
+void GuiSetDuressPasswordFail(void *param);
+bool GuiIsDuressFlowActive(void);
+
 // set passphrase
 void GuiWalletPassphrase(lv_obj_t *parent);
 void GuiWalletPassphraseEnter(lv_obj_t *parent, bool needVerify);

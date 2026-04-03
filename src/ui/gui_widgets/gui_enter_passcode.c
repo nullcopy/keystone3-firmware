@@ -132,7 +132,8 @@ static void SetPinEventHandler(lv_event_t *e)
                     GuiModelVerifyAccountPassWord(g_userParam);
                     break;
                 case ENTER_PASSCODE_SET_PIN:
-                    if (CheckPasswordExisted(g_pinBuf, index)) {
+                    if (CheckPasswordExisted(g_pinBuf, index) ||
+                            (!GuiIsDuressFlowActive() && IsDuressPasswordMatch(g_pinBuf))) {
                         UnlimitedVibrate(LONG);
                         lv_obj_clear_flag(item->repeatLabel, LV_OBJ_FLAG_HIDDEN);
                     } else {
@@ -187,7 +188,8 @@ static void SetPassWordHandler(lv_event_t *e)
                 if (g_userParam != NULL && *(uint16_t *)g_userParam == DEVICE_SETTING_RESET_PASSCODE_VERIFY) {
                     index = GetCurrentAccountIndex();
                 }
-                if (CheckPasswordExisted(currText, index)) {
+                if (CheckPasswordExisted(currText, index) ||
+                        (!GuiIsDuressFlowActive() && IsDuressPasswordMatch(currText))) {
                     UnlimitedVibrate(LONG);
                     lv_obj_clear_flag(item->repeatLabel, LV_OBJ_FLAG_HIDDEN);
                     delayFlag = true;
@@ -509,9 +511,11 @@ void GuiCreateEnterPinCode(GuiEnterPasscodeItem_t *item, EnterPassCodeParam_t *p
 
     label = GuiCreateScrollTitleLabel(pinCont, g_enterPassLabel[mode].title);
     lv_obj_align(label, LV_ALIGN_DEFAULT, 36, 156 - GUI_MAIN_AREA_OFFSET);
+    item->titleLabel = label;
 
     lv_obj_t *subLabel = GuiCreateNoticeLabel(pinCont, g_enterPassLabel[mode].desc);
     lv_obj_align_to(subLabel, label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 24);
+    item->descLabel = subLabel;
 
     label = GuiCreateIllustrateLabel(pinCont, _("password_error_not_match"));
     lv_obj_set_style_text_color(label, RED_COLOR, LV_PART_MAIN);
@@ -661,7 +665,7 @@ void GuiUpdateEnterPasscodeParam(GuiEnterPasscodeItem_t *item, void *param)
 }
 
 // set title label
-void GuiSetPasscodeTileLabel(GuiEnterPasscodeItem_t *item, const char *text)
+void GuiSetPasscodeTitleLabel(GuiEnterPasscodeItem_t *item, const char *text)
 {
     if (item != NULL) {
         lv_label_set_text(item->titleLabel, text);

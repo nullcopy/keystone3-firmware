@@ -79,10 +79,18 @@ int32_t GuiSettingViewEventProcess(void *self, uint16_t usEvent, void *param, ui
         GuiVerifyCurrentPasswordErrorCount(param);
         break;
     case SIG_SETTING_SET_PIN:
-        GuiSettingSetPinPass((const char *)param);
+        if (GuiIsDuressFlowActive()) {
+            GuiDuressPinSetPinPass((const char *)param);
+        } else {
+            GuiSettingSetPinPass((const char *)param);
+        }
         break;
     case SIG_SETTING_REPEAT_PIN:
-        GuiSettingRepeatPinPass((const char *)param);
+        if (GuiIsDuressFlowActive()) {
+            GuiDuressPinRepeatPinPass((const char *)param);
+        } else {
+            GuiSettingRepeatPinPass((const char *)param);
+        }
         break;
     case SIG_SETTING_CHANGE_WALLET_DESC_PASS:
         GuiChangeWalletDesc(true);
@@ -95,6 +103,12 @@ int32_t GuiSettingViewEventProcess(void *self, uint16_t usEvent, void *param, ui
         break;
     case SIG_SETTING_WRITE_PASSPHRASE_FAIL:
         GuiWritePassphrase(false);
+        break;
+    case SIG_SETTING_SET_DURESS_PASSWORD_PASS:
+        GuiSetDuressPasswordSuccess();
+        break;
+    case SIG_SETTING_SET_DURESS_PASSWORD_FAIL:
+        GuiSetDuressPasswordFail(param);
         break;
     case SIG_SETTING_CHANGE_PASSWORD_PASS:
         GuiChangePassWord(true);

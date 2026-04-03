@@ -53,6 +53,8 @@ void GuiEnterPassLabelRefresh(void);
 void GuiShuffleNumKeyBoardMap(GuiEnterPasscodeItem_t *item);
 void GuiSetNumKeyBoardMapDefault(GuiEnterPasscodeItem_t *item);
 void SwitchPasswordMode(lv_obj_t *ta, lv_obj_t *img, bool isPassword);
+void GuiSetPasscodeTitleLabel(GuiEnterPasscodeItem_t *item, const char *text);
+void GuiSetPasscodeDescLabel(GuiEnterPasscodeItem_t *item, const char *text);
 
 #endif /* _GUI_ENTER_PASSCODE_H */
 

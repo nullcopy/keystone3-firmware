@@ -48,6 +48,11 @@ static lv_obj_t *g_walletSetIcon = NULL;                    // wallet setting ic
 static lv_obj_t *g_walletSetLabel = NULL;                   // wallet setting label
 static lv_obj_t *g_mfpLabel = NULL;                         // wallet setting label
 static lv_obj_t *g_resetingCont = NULL;                     // resetting container
+static lv_obj_t *g_duressNoticeWindow = NULL;
+static lv_obj_t *g_duressStatusLabel = NULL;
+static GuiEnterPasscodeItem_t *g_duressSetPassCode = NULL;
+static GuiEnterPasscodeItem_t *g_duressRepeatPassCode = NULL;
+static char g_duressPassCode[PASSWORD_MAX_LEN + 1];
 static lv_timer_t *g_countDownTimer = NULL;                 // count down timer
 static lv_obj_t *g_hintBox = NULL;
 
@@ -293,6 +298,97 @@ void GuiSettingRepeatPinPass(const char *buf)
     }
 }
 
+// duress pin
+void GuiDuressPinSetPinWidget(lv_obj_t *parent, uint8_t tile)
+{
+    static uint8_t currentTile = 0;
+    currentTile = tile;
+    lv_obj_set_style_bg_opa(parent, LV_OPA_0, LV_PART_SCROLLBAR | LV_STATE_SCROLLED);
+    lv_obj_set_style_bg_opa(parent, LV_OPA_0, LV_PART_SCROLLBAR | LV_STATE_DEFAULT);
+
+    g_duressSetPassCode = GuiCreateEnterPasscode(parent, NULL, &currentTile, ENTER_PASSCODE_SET_PIN);
+    GuiSetPasscodeTitleLabel(g_duressSetPassCode, _("duress_pin_set_title"));
+    GuiSetPasscodeDescLabel(g_duressSetPassCode, _("duress_pin_set_desc"));
+}
+
+void GuiDuressPinRepeatPinWidget(lv_obj_t *parent)
+{
+    lv_obj_set_style_bg_opa(parent, LV_OPA_0, LV_PART_SCROLLBAR | LV_STATE_SCROLLED);
+    lv_obj_set_style_bg_opa(parent, LV_OPA_0, LV_PART_SCROLLBAR | LV_STATE_DEFAULT);
+
+    g_duressRepeatPassCode = GuiCreateEnterPasscode(parent, NULL, NULL, g_duressSetPassCode->mode + 2);
+    GuiSetPasscodeTitleLabel(g_duressRepeatPassCode, _("duress_pin_repeat_title"));
+    GuiSetPasscodeDescLabel(g_duressRepeatPassCode, _("duress_pin_repeat_desc"));
+}
+
+void GuiDuressPinSetPinPass(const char *buf)
+{
+    static uint8_t walletIndex = DEVICE_SETTING_DURESS_PIN_SETPIN;
+    GuiEmitSignal(SIG_SETUP_VIEW_TILE_NEXT, &walletIndex, sizeof(walletIndex));
+    strcpy_s(g_duressPassCode, PASSWORD_MAX_LEN, buf);
+}
+
+void GuiDuressPinRepeatPinPass(const char *buf)
+{
+    if (!strcmp(buf, g_duressPassCode)) {
+        GuiResettingWriteSe();
+        SecretCacheSetNewPassword((char *)buf);
+        GuiModelSetDuressPassword();
+    } else {
+        GuiEnterPassCodeStatus(g_duressRepeatPassCode, false);
+    }
+}
+
+void GuiSetDuressPinDestruct(void *obj, void *param)
+{
+    static uint16_t currentTile = DEVICE_SETTING_DURESS_PIN_VERIFY;
+    GuiDelEnterPasscode(g_duressSetPassCode, NULL);
+    g_duressSetPassCode = NULL;
+    memset_s(g_duressPassCode, sizeof(g_duressPassCode), 0, sizeof(g_duressPassCode));
+    UNUSED(currentTile);
+}
+
+void GuiRepeatDuressPinDestruct(void *obj, void *param)
+{
+    static uint16_t currentTile = DEVICE_SETTING_DURESS_PIN_VERIFY;
+    GuiDelEnterPasscode(g_duressRepeatPassCode, NULL);
+    g_duressRepeatPassCode = NULL;
+    memset_s(g_duressPassCode, sizeof(g_duressPassCode), 0, sizeof(g_duressPassCode));
+    if (g_duressSetPassCode != NULL) {
+        GuiUpdateEnterPasscodeParam(g_duressSetPassCode, &currentTile);
+    }
+}
+
+static void CloseDuressNoticeToWalletSettings(lv_event_t *e)
+{
+    GUI_DEL_OBJ(g_duressNoticeWindow)
+    GuiSettingCloseToTargetTileView(DEVICE_SETTING_WALLET_SETTING);
+}
+
+void GuiSetDuressPasswordSuccess(void)
+{
+    GuiStopCircleAroundAnimation();
+    GUI_DEL_OBJ(g_resetingCont)
+    if (g_duressStatusLabel != NULL) {
+        lv_label_set_text(g_duressStatusLabel, _("On"));
+    }
+    g_duressNoticeWindow = GuiCreateConfirmHintBox(&imgSuccess, _("duress_pin_success_title"), _("duress_pin_success_desc"), NULL, _("Done"), ORANGE_COLOR);
+    lv_obj_add_event_cb(GuiGetHintBoxRightBtn(g_duressNoticeWindow), CloseDuressNoticeToWalletSettings, LV_EVENT_CLICKED, NULL);
+}
+
+void GuiSetDuressPasswordFail(void *param)
+{
+    GuiStopCircleAroundAnimation();
+    GUI_DEL_OBJ(g_resetingCont)
+    g_duressNoticeWindow = GuiCreateConfirmHintBox(&imgFailed, _("duress_pin_fail_title"), _("duress_pin_fail_desc"), NULL, _("OK"), ORANGE_COLOR);
+    lv_obj_add_event_cb(GuiGetHintBoxRightBtn(g_duressNoticeWindow), CloseDuressNoticeToWalletSettings, LV_EVENT_CLICKED, NULL);
+}
+
+bool GuiIsDuressFlowActive(void)
+{
+    return g_duressSetPassCode != NULL;
+}
+
 void GuiDelWallet(bool result)
 {
     GuiDeleteAnimHintBox();
@@ -387,7 +483,16 @@ void GuiShowKeyboardHandler(lv_event_t *e)
 void GuiVerifyCurrentPasswordErrorCount(void *param)
 {
     PasswordVerifyResult_t *passwordVerifyResult = (PasswordVerifyResult_t *)param;
-    GuiShowErrorNumber(g_keyboardWidget, passwordVerifyResult);
+    if (g_keyboardWidget != NULL) {
+        GuiShowErrorNumber(g_keyboardWidget, passwordVerifyResult);
+        return;
+    }
+    // Keyboard widget is NULL when the flow uses GuiCreateEnterPasscode
+    // (e.g. duress PIN verify, passphrase verify). Show error on that widget.
+    GuiEnterPasscodeItem_t *verifyCode = GuiSettingGetVerifyCode();
+    if (verifyCode != NULL) {
+        GuiEnterPassCodeStatus(verifyCode, false);
+    }
 }
 
 void GuiSettingStructureCb(void *obj, void *param)
@@ -420,9 +525,10 @@ void GuiWalletSetWidget(lv_obj_t *parent)
 {
     bool isTon = GetMnemonicType() == MNEMONIC_TYPE_TON;
     lv_event_cb_t passphraseCb = WalletSettingHandler;
-    static uint32_t walletSetting[5] = {
+    static uint32_t walletSetting[6] = {
         DEVICE_SETTING_CHANGE_WALLET_DESC,
         DEVICE_SETTING_FINGERPRINT_PASSCODE,
+        DEVICE_SETTING_DURESS_PIN,
         DEVICE_SETTING_PASSPHRASE,
         DEVICE_SETTING_RECOVERY_METHOD_CHECK,
         DEVICE_SETTING_ADD_WALLET
@@ -491,12 +597,25 @@ void GuiWalletSetWidget(lv_obj_t *parent)
     lv_obj_align(button, LV_ALIGN_DEFAULT, 12, nextY);
     nextY = nextY + 96;
 
+    label = GuiCreateTextLabel(parent, _("duress_pin_title"));
+    g_duressStatusLabel = GuiCreateNoticeLabel(parent, IsDuressPasswordSet() ? _("On") : _("Off"));
+    lv_obj_set_style_text_color(g_duressStatusLabel, ORANGE_COLOR, LV_PART_MAIN);
+    imgArrow = GuiCreateImg(parent, &imgArrowRight);
+    GuiButton_t duressTable[3] = {
+        {.obj = label, .align = LV_ALIGN_DEFAULT, .position = {24, 24}},
+        {.obj = g_duressStatusLabel, .align = LV_ALIGN_DEFAULT, .position = {319, 30}},
+        {.obj = imgArrow, .align = LV_ALIGN_DEFAULT, .position = {411, 32}},
+    };
+    button = GuiCreateButton(parent, 456, 84, duressTable, 3, WalletSettingHandler, &walletSetting[2]);
+    lv_obj_align(button, LV_ALIGN_DEFAULT, 12, nextY);
+    nextY = nextY + 96;
+
     if (!isTon) {
         label = GuiCreateTextLabel(parent, _("Passphrase"));
         imgArrow = GuiCreateImg(parent, &imgArrowRight);
         table[0].obj = label;
         table[1].obj = imgArrow;
-        button = GuiCreateButton(parent, 456, 84, table, 2, passphraseCb, &walletSetting[2]);
+        button = GuiCreateButton(parent, 456, 84, table, 2, passphraseCb, &walletSetting[3]);
         lv_obj_align(button, LV_ALIGN_DEFAULT, 12, nextY);
         nextY = nextY + 96;
     }
@@ -506,7 +625,7 @@ void GuiWalletSetWidget(lv_obj_t *parent)
     table[0].obj = label;
     table[1].obj = imgArrow;
 
-    button = GuiCreateButton(parent, 456, 84, table, 2, WalletSettingHandler, &walletSetting[3]);
+    button = GuiCreateButton(parent, 456, 84, table, 2, WalletSettingHandler, &walletSetting[4]);
     lv_obj_align(button, LV_ALIGN_DEFAULT, 12, nextY);
     nextY = nextY + 88;
 
@@ -517,7 +636,7 @@ void GuiWalletSetWidget(lv_obj_t *parent)
     label = GuiCreateTextLabel(parent, _("wallet_setting_add_wallet"));
     lv_obj_set_style_text_color(label, ORANGE_COLOR, LV_PART_MAIN);
     table[0].obj = label;
-    button = GuiCreateButton(parent, 456, 84, table, 1, GuiShowKeyboardHandler, &walletSetting[4]);
+    button = GuiCreateButton(parent, 456, 84, table, 1, GuiShowKeyboardHandler, &walletSetting[5]);
     lv_obj_align(button, LV_ALIGN_DEFAULT, 12, nextY);
 }
 

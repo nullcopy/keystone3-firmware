@@ -233,6 +233,26 @@ void GuiModelChangeAccountPassWord(void)
     AsyncExecute(ModelChangeAccountPass, NULL, 0);
 }
 
+static int32_t ModelSetDuressPassword(const void *inData, uint32_t inDataLen)
+{
+    bool enable = IsPreviousLockScreenEnable();
+    SetLockScreen(false);
+    int32_t ret = SetDuressPassword(SecretCacheGetNewPassword());
+    if (ret == SUCCESS_CODE) {
+        GuiApiEmitSignal(SIG_SETTING_SET_DURESS_PASSWORD_PASS, NULL, 0);
+    } else {
+        GuiApiEmitSignal(SIG_SETTING_SET_DURESS_PASSWORD_FAIL, &ret, sizeof(ret));
+    }
+    ClearSecretCache();
+    SetLockScreen(enable);
+    return SUCCESS_CODE;
+}
+
+void GuiModelSetDuressPassword(void)
+{
+    AsyncExecute(ModelSetDuressPassword, NULL, 0);
+}
+
 void GuiModelVerifyAccountPassWord(uint16_t *param)
 {
     AsyncExecute(ModelVerifyAccountPass, param, sizeof(*param));

@@ -26,6 +26,7 @@
 #include "librust_c.h"
 #include "assert.h"
 #include "secret_cache.h"
+#include "device_setting.h"
 #include "drv_mpu.h"
 #ifdef COMPILE_SIMULATOR
 #include "simulator_model.h"
@@ -109,6 +110,10 @@ int32_t SaveNewBip39Entropy(uint8_t accountIndex, const uint8_t *entropy, uint8_
     do {
         ret = CheckPasswordExisted(password, 255);
         CHECK_ERRCODE_BREAK("check repeat password", ret);
+        if (IsDuressPasswordMatch(password)) {
+            ret = ERR_KEYSTORE_DURESS_PASSWORD_CONFLICT;
+            break;
+        }
         memcpy_s(accountSecret.entropy, sizeof(accountSecret.entropy), entropy, entropyLen);
         accountSecret.entropyLen = entropyLen;
         // bip39 entropy->mnemonic->seed
@@ -157,6 +162,10 @@ int32_t SaveNewSlip39Entropy(uint8_t accountIndex, const uint8_t *ems, const uin
     do {
         ret = CheckPasswordExisted(password, 255);
         CHECK_ERRCODE_BREAK("check repeat password", ret);
+        if (IsDuressPasswordMatch(password)) {
+            ret = ERR_KEYSTORE_DURESS_PASSWORD_CONFLICT;
+            break;
+        }
         memcpy_s(accountSecret.entropy, sizeof(accountSecret.entropy), entropy, entropyLen);
         accountSecret.entropyLen = entropyLen;
 
@@ -272,6 +281,10 @@ int32_t ChangePassword(uint8_t accountIndex, const char *newPassword, const char
     do {
         ret = CheckPasswordExisted(newPassword, accountIndex);
         CHECK_ERRCODE_BREAK("check repeat password", ret);
+        if (IsDuressPasswordMatch(newPassword)) {
+            ret = ERR_KEYSTORE_DURESS_PASSWORD_CONFLICT;
+            break;
+        }
         ret = LoadAccountSecret(accountIndex, &accountSecret, password);
         CHECK_ERRCODE_BREAK("load account secret", ret);
         ret = SaveAccountSecret(accountIndex, &accountSecret, newPassword, false);
@@ -290,17 +303,22 @@ int32_t ChangePassword(uint8_t accountIndex, const char *newPassword, const char
 /// @return err code.
 int32_t VerifyPassword(uint8_t *accountIndex, const char *password)
 {
-    uint8_t passwordHashClac[32], passwordHashStore[32];
-    int32_t ret, i;
-#ifdef COMPILE_SIMULATOR
-    return SimulatorVerifyPassword(accountIndex, password);
-#endif
+    int32_t ret;
 
+#ifdef COMPILE_SIMULATOR
+    ret = SimulatorVerifyPassword(accountIndex, password);
+#else
+    uint8_t passwordHashCalc[32], passwordHashStore[32];
+    int32_t i;
+
+    // Compute hash once for all comparisons
+    HashWithSalt(passwordHashCalc, (const uint8_t *)password, strnlen_s(password, PASSWORD_MAX_LEN), "password hash");
+
+    // Check account passwords
     for (i = 0; i < 3; i++) {
         ret = SE_HmacEncryptRead(passwordHashStore, i * PAGE_NUM_PER_ACCOUNT + PAGE_INDEX_PASSWORD_HASH);
         CHECK_ERRCODE_BREAK("read password hash", ret);
-        HashWithSalt(passwordHashClac, (const uint8_t *)password, strnlen_s(password, PASSWORD_MAX_LEN), "password hash");
-        if (memcmp(passwordHashStore, passwordHashClac, 32) == 0) {
+        if (memcmp(passwordHashStore, passwordHashCalc, 32) == 0) {
             if (accountIndex != NULL) {
                 *accountIndex = i;
             }
@@ -312,7 +330,9 @@ int32_t VerifyPassword(uint8_t *accountIndex, const char *password)
     }
 
     CLEAR_ARRAY(passwordHashStore);
-    CLEAR_ARRAY(passwordHashClac);
+    CLEAR_ARRAY(passwordHashCalc);
+#endif
+
     return ret;
 }
 
@@ -333,6 +353,91 @@ int32_t CheckPasswordExisted(const char *password, uint8_t excludeIndex)
         ret = SUCCESS_CODE;
     }
     return ret;
+}
+
+/// @brief Set duress password hash in SE.
+/// @param[in] password Duress password string.
+/// @return err code, ERR_KEYSTORE_DURESS_PASSWORD_CONFLICT if password matches an existing account.
+int32_t SetDuressPassword(const char *password)
+{
+    int32_t ret;
+
+    ret = CheckPasswordExisted(password, 255);
+    if (ret == ERR_KEYSTORE_REPEAT_PASSWORD) {
+        return ERR_KEYSTORE_DURESS_PASSWORD_CONFLICT;
+    }
+    CHECK_ERRCODE_RETURN_INT(ret);
+
+#ifdef COMPILE_SIMULATOR
+    return SimulatorSetDuressPassword(password);
+#else
+    uint8_t passwordHash[32];
+    HashWithSalt(passwordHash, (const uint8_t *)password, strnlen_s(password, PASSWORD_MAX_LEN), "password hash");
+    ret = SE_HmacEncryptWrite(passwordHash, PAGE_DURESS_PASSWORD_HASH);
+    CLEAR_ARRAY(passwordHash);
+#endif
+    return ret;
+}
+
+/// @brief Clear duress password hash from SE.
+/// @return err code.
+int32_t ClearDuressPassword(void)
+{
+#ifdef COMPILE_SIMULATOR
+    return SimulatorClearDuressPassword();
+#else
+    uint8_t zero[32] = {0};
+    return SE_HmacEncryptWrite(zero, PAGE_DURESS_PASSWORD_HASH);
+#endif
+}
+
+/// @brief Check if password matches the duress password.
+/// @param[in] password Password string.
+/// @return true if password matches duress password.
+bool IsDuressPasswordMatch(const char *password)
+{
+#ifdef COMPILE_SIMULATOR
+    return SimulatorIsDuressPasswordMatch(password);
+#else
+    uint8_t duressHashStore[32], passwordHashCalc[32];
+    int32_t ret;
+
+    ret = SE_HmacEncryptRead(duressHashStore, PAGE_DURESS_PASSWORD_HASH);
+    if (ret != SUCCESS_CODE) {
+        CLEAR_ARRAY(duressHashStore);
+        return false;
+    }
+
+    if (CheckAllFF(duressHashStore, 32) || CheckAllZero(duressHashStore, 32)) {
+        CLEAR_ARRAY(duressHashStore);
+        return false;
+    }
+
+    HashWithSalt(passwordHashCalc, (const uint8_t *)password, strnlen_s(password, PASSWORD_MAX_LEN), "password hash");
+    bool match = (memcmp(duressHashStore, passwordHashCalc, 32) == 0);
+    CLEAR_ARRAY(duressHashStore);
+    CLEAR_ARRAY(passwordHashCalc);
+    return match;
+#endif
+}
+
+/// @brief Check if a duress password is configured.
+/// @return true if duress password is set.
+bool IsDuressPasswordSet(void)
+{
+#ifdef COMPILE_SIMULATOR
+    return SimulatorIsDuressPasswordSet();
+#else
+    uint8_t duressHashStore[32];
+    int32_t ret = SE_HmacEncryptRead(duressHashStore, PAGE_DURESS_PASSWORD_HASH);
+    if (ret != SUCCESS_CODE) {
+        CLEAR_ARRAY(duressHashStore);
+        return false;
+    }
+    bool isSet = !CheckAllFF(duressHashStore, 32) && !CheckAllZero(duressHashStore, 32);
+    CLEAR_ARRAY(duressHashStore);
+    return isSet;
+#endif
 }
 
 /// @brief Set passphrase
@@ -722,6 +827,10 @@ int32_t SaveNewTonMnemonic(uint8_t accountIndex, const char *mnemonic, const cha
     do {
         ret = CheckPasswordExisted(password, 255);
         CHECK_ERRCODE_BREAK("check repeat password", ret);
+        if (IsDuressPasswordMatch(password)) {
+            ret = ERR_KEYSTORE_DURESS_PASSWORD_CONFLICT;
+            break;
+        }
         VecFFI_u8 *result = ton_mnemonic_to_entropy(mnemonic);
         memcpy_s(entropy, sizeof(entropy), result->data, result->size);
         free_VecFFI_u8(result);

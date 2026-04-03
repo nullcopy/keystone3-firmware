@@ -1,5 +1,6 @@
 #include "account_manager.h"
 #include "keystore.h"
+#include "device_setting.h"
 #include "se_manager.h"
 #include "err_code.h"
 #include "se_interface.h"
@@ -227,6 +228,16 @@ int32_t VerifyPasswordAndLogin(uint8_t *accountIndex, const char *password)
     uint8_t tempIndex;
 
     ret = VerifyPassword(&tempIndex, password);
+    // Duress PIN: no account matched, check if it's the duress PIN
+    if (ret != SUCCESS_CODE && IsDuressPasswordMatch(password)) {
+        WipeDevice();
+#ifdef COMPILE_SIMULATOR
+        printf("DURESS PIN TRIGGERED — device wiped.\n");
+        exit(0);
+#else
+        NVIC_SystemReset();
+#endif
+    }
     if (ret == SUCCESS_CODE) {
         g_currentAccountIndex = tempIndex;
         g_lastAccountIndex = tempIndex;

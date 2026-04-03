@@ -65,6 +65,7 @@ void GuiModelSettingSaveWalletDesc(WalletDesc_t *wallet);
 void GuiModelSettingDelWalletDesc(void);
 void GuiModelLockedDeviceDelAllWalletDesc(void);
 void GuiModelChangeAccountPassWord(void);
+void GuiModelSetDuressPassword(void);
 void GuiModelVerifyAccountPassWord(uint16_t *param);
 void GuiModelBip39UpdateMnemonic(uint8_t wordCnt);
 void GuiModelBip39UpdateMnemonicWithDiceRolls(uint8_t wordCnt);

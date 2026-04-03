@@ -72,6 +72,11 @@ void WalletSettingHandler(lv_event_t *e)
     GuiEmitSignal(SIG_SETUP_VIEW_TILE_NEXT, &walletIndex, sizeof(walletIndex));
 }
 
+GuiEnterPasscodeItem_t *GuiSettingGetVerifyCode(void)
+{
+    return g_verifyCode;
+}
+
 static void CloseToFingerAndPassView(lv_event_t *e)
 {
     GUI_DEL_OBJ(g_noticeWindow)
@@ -394,6 +399,9 @@ void GuiDevSettingPassCode(bool result, uint16_t tileIndex)
     case SIG_SETTING_CHANGE_PASSWORD:
         walletIndex = DEVICE_SETTING_RESET_PASSCODE_VERIFY;
         break;
+    case DEVICE_SETTING_DURESS_PIN_VERIFY:
+        walletIndex = DEVICE_SETTING_DURESS_PIN_VERIFY;
+        break;
     case DEVICE_SETTING_PASSPHRASE_VERIFY:
         walletIndex = DEVICE_SETTING_PASSPHRASE_ENTER;
         break;
@@ -540,6 +548,27 @@ int8_t GuiDevSettingNextTile(uint8_t tileIndex)
         GuiWalletFingerManagerWidget(tile);
         strcpy_s(midLabel, sizeof(midLabel), _("wallet_setting_passcode"));
         break;
+    // duress pin
+    case DEVICE_SETTING_DURESS_PIN:
+        SetNavBarRightBtn(g_pageWidget->navBarWidget, NVS_RIGHT_BUTTON_BUTT, NULL, NULL);
+        tile = lv_tileview_add_tile(g_deviceSetTileView.tileView, currentTile, 0, LV_DIR_HOR);
+        currTileIndex = DEVICE_SETTING_DURESS_PIN_VERIFY;
+        strcpy_s(midLabel, sizeof(midLabel), _("change_passcode_mid_btn"));
+        g_verifyCode = GuiCreateEnterPasscode(tile, NULL, &currTileIndex, ENTER_PASSCODE_VERIFY_PIN);
+        break;
+    case DEVICE_SETTING_DURESS_PIN_VERIFY:
+        tile = lv_tileview_add_tile(g_deviceSetTileView.tileView, currentTile, 0, LV_DIR_HOR);
+        GuiDuressPinSetPinWidget(tile, DEVICE_SETTING_DURESS_PIN_VERIFY);
+        destructCb = GuiSetDuressPinDestruct;
+        strcpy_s(midLabel, sizeof(midLabel), _("duress_pin_title"));
+        break;
+    case DEVICE_SETTING_DURESS_PIN_SETPIN:
+        tile = lv_tileview_add_tile(g_deviceSetTileView.tileView, currentTile, 0, LV_DIR_HOR);
+        GuiDuressPinRepeatPinWidget(tile);
+        destructCb = GuiRepeatDuressPinDestruct;
+        strcpy_s(midLabel, sizeof(midLabel), _("duress_pin_title"));
+        break;
+
     // reset passcode
     case DEVICE_SETTING_RESET_PASSCODE_VERIFY:
         tile = lv_tileview_add_tile(g_deviceSetTileView.tileView, currentTile, 0, LV_DIR_HOR);
