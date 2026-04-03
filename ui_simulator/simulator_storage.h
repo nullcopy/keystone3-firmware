@@ -10,6 +10,7 @@ int32_t SimulatorLoadAccountSecret(uint8_t accountIndex, AccountSecret_t *accoun
 uint8_t SimulatorGetAccountNum(void);
 int32_t SimulatorVerifyPassword(uint8_t *accountIndex, const char *password);
 int32_t SimulatorVerifyCurrentPassword(uint8_t accountIndex, const char *password);
+void SimulatorWipeDevice(void);
 int32_t SimulatorSetDuressPassword(const char *password);
 int32_t SimulatorClearDuressPassword(void);
 bool SimulatorIsDuressPasswordMatch(const char *password);

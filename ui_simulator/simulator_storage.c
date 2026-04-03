@@ -66,6 +66,13 @@ SimulatorFlashPath g_simulatorPathMap[] = {
     {SIMULATOR_DURESS_SECRET_ADDR, PC_SIMULATOR_PATH "/duress_secret.json", StorageGetData, StorageSetData},
 };
 
+void SimulatorWipeDevice(void)
+{
+    for (int i = 0; i < sizeof(g_simulatorPathMap) / sizeof(g_simulatorPathMap[0]); i++) {
+        remove(g_simulatorPathMap[i].path);
+    }
+}
+
 const char *FindSimulatorFlashPath(uint32_t addr)
 {
     for (int i = 0; i < sizeof(g_simulatorPathMap) / sizeof(g_simulatorPathMap[0]); i++) {
