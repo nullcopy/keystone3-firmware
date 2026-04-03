@@ -79,7 +79,9 @@ int32_t GuiSettingViewEventProcess(void *self, uint16_t usEvent, void *param, ui
         GuiVerifyCurrentPasswordErrorCount(param);
         break;
     case SIG_SETTING_SET_PIN:
-        if (GuiIsDuressFlowActive()) {
+        if (GuiIsDuressConfirmActive()) {
+            GuiDuressPinConfirmResult((const char *)param);
+        } else if (GuiIsDuressFlowActive()) {
             GuiDuressPinSetPinPass((const char *)param);
         } else {
             GuiSettingSetPinPass((const char *)param);

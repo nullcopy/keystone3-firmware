@@ -52,6 +52,7 @@ static lv_obj_t *g_duressNoticeWindow = NULL;
 static lv_obj_t *g_duressStatusLabel = NULL;
 static GuiEnterPasscodeItem_t *g_duressSetPassCode = NULL;
 static GuiEnterPasscodeItem_t *g_duressRepeatPassCode = NULL;
+static GuiEnterPasscodeItem_t *g_duressConfirmPassCode = NULL;
 static char g_duressPassCode[PASSWORD_MAX_LEN + 1];
 static lv_timer_t *g_countDownTimer = NULL;                 // count down timer
 static lv_obj_t *g_hintBox = NULL;
@@ -387,6 +388,83 @@ void GuiSetDuressPasswordFail(void *param)
 bool GuiIsDuressFlowActive(void)
 {
     return g_duressSetPassCode != NULL;
+}
+
+bool GuiIsDuressConfirmActive(void)
+{
+    return g_duressConfirmPassCode != NULL;
+}
+
+// duress pin menu (change / verify)
+static void DuressMenuChangeHandler(lv_event_t *e)
+{
+    static uint8_t walletIndex = DEVICE_SETTING_DURESS_PIN_VERIFY;
+    GuiEmitSignal(SIG_SETUP_VIEW_TILE_NEXT, &walletIndex, sizeof(walletIndex));
+}
+
+static void DuressMenuVerifyHandler(lv_event_t *e)
+{
+    static uint8_t walletIndex = DEVICE_SETTING_DURESS_PIN_CONFIRM;
+    GuiEmitSignal(SIG_SETUP_VIEW_TILE_NEXT, &walletIndex, sizeof(walletIndex));
+}
+
+void GuiDuressPinMenuWidget(lv_obj_t *parent)
+{
+    lv_obj_set_style_bg_opa(parent, LV_OPA_0, LV_PART_SCROLLBAR | LV_STATE_SCROLLED);
+    lv_obj_set_style_bg_opa(parent, LV_OPA_0, LV_PART_SCROLLBAR | LV_STATE_DEFAULT);
+
+    int nextY = 156 - GUI_MAIN_AREA_OFFSET;
+    lv_obj_t *label, *imgArrow;
+
+    label = GuiCreateTextLabel(parent, _("duress_pin_change"));
+    imgArrow = GuiCreateImg(parent, &imgArrowRight);
+    GuiButton_t table[2] = {
+        {.obj = label, .align = LV_ALIGN_DEFAULT, .position = {24, 24}},
+        {.obj = imgArrow, .align = LV_ALIGN_DEFAULT, .position = {411, 32}},
+    };
+    lv_obj_t *button = GuiCreateButton(parent, 456, 84, table, 2, DuressMenuChangeHandler, NULL);
+    lv_obj_align(button, LV_ALIGN_DEFAULT, 12, nextY);
+    nextY += 96;
+
+    label = GuiCreateTextLabel(parent, _("duress_pin_verify_title"));
+    imgArrow = GuiCreateImg(parent, &imgArrowRight);
+    table[0].obj = label;
+    table[1].obj = imgArrow;
+    button = GuiCreateButton(parent, 456, 84, table, 2, DuressMenuVerifyHandler, NULL);
+    lv_obj_align(button, LV_ALIGN_DEFAULT, 12, nextY);
+}
+
+void GuiDuressPinMenuDestruct(void *obj, void *param)
+{
+    // Menu tile is owned by the tileview; nothing to free.
+}
+
+// duress pin confirm (verify existing)
+void GuiDuressPinConfirmWidget(lv_obj_t *parent)
+{
+    static uint8_t currentTile = 0;
+    lv_obj_set_style_bg_opa(parent, LV_OPA_0, LV_PART_SCROLLBAR | LV_STATE_SCROLLED);
+    lv_obj_set_style_bg_opa(parent, LV_OPA_0, LV_PART_SCROLLBAR | LV_STATE_DEFAULT);
+
+    g_duressConfirmPassCode = GuiCreateEnterPasscode(parent, NULL, &currentTile, ENTER_PASSCODE_SET_PIN);
+    GuiSetPasscodeTitleLabel(g_duressConfirmPassCode, _("duress_pin_verify_title"));
+    GuiSetPasscodeDescLabel(g_duressConfirmPassCode, _("duress_pin_verify_desc"));
+}
+
+void GuiDuressPinConfirmDestruct(void *obj, void *param)
+{
+    GuiDelEnterPasscode(g_duressConfirmPassCode, NULL);
+    g_duressConfirmPassCode = NULL;
+}
+
+void GuiDuressPinConfirmResult(const char *buf)
+{
+    if (IsDuressPasswordMatch(buf)) {
+        g_duressNoticeWindow = GuiCreateConfirmHintBox(&imgSuccess, _("duress_pin_verified_title"), _("duress_pin_verified_desc"), NULL, _("Done"), ORANGE_COLOR);
+        lv_obj_add_event_cb(GuiGetHintBoxRightBtn(g_duressNoticeWindow), CloseDuressNoticeToWalletSettings, LV_EVENT_CLICKED, NULL);
+    } else {
+        GuiEnterPassCodeStatus(g_duressConfirmPassCode, false);
+    }
 }
 
 void GuiDelWallet(bool result)

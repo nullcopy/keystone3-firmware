@@ -132,8 +132,9 @@ static void SetPinEventHandler(lv_event_t *e)
                     GuiModelVerifyAccountPassWord(g_userParam);
                     break;
                 case ENTER_PASSCODE_SET_PIN:
-                    if (CheckPasswordExisted(g_pinBuf, index) ||
-                            (!GuiIsDuressFlowActive() && IsDuressPasswordMatch(g_pinBuf))) {
+                    if (!GuiIsDuressConfirmActive() &&
+                            (CheckPasswordExisted(g_pinBuf, index) ||
+                             (!GuiIsDuressFlowActive() && IsDuressPasswordMatch(g_pinBuf)))) {
                         UnlimitedVibrate(LONG);
                         lv_obj_clear_flag(item->repeatLabel, LV_OBJ_FLAG_HIDDEN);
                     } else {
@@ -188,8 +189,9 @@ static void SetPassWordHandler(lv_event_t *e)
                 if (g_userParam != NULL && *(uint16_t *)g_userParam == DEVICE_SETTING_RESET_PASSCODE_VERIFY) {
                     index = GetCurrentAccountIndex();
                 }
-                if (CheckPasswordExisted(currText, index) ||
-                        (!GuiIsDuressFlowActive() && IsDuressPasswordMatch(currText))) {
+                if (!GuiIsDuressConfirmActive() &&
+                        (CheckPasswordExisted(currText, index) ||
+                         (!GuiIsDuressFlowActive() && IsDuressPasswordMatch(currText)))) {
                     UnlimitedVibrate(LONG);
                     lv_obj_clear_flag(item->repeatLabel, LV_OBJ_FLAG_HIDDEN);
                     delayFlag = true;

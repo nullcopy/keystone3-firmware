@@ -400,7 +400,7 @@ void GuiDevSettingPassCode(bool result, uint16_t tileIndex)
         walletIndex = DEVICE_SETTING_RESET_PASSCODE_VERIFY;
         break;
     case DEVICE_SETTING_DURESS_PIN_VERIFY:
-        walletIndex = DEVICE_SETTING_DURESS_PIN_VERIFY;
+        walletIndex = IsDuressPasswordSet() ? DEVICE_SETTING_DURESS_PIN_MENU : DEVICE_SETTING_DURESS_PIN_VERIFY;
         break;
     case DEVICE_SETTING_PASSPHRASE_VERIFY:
         walletIndex = DEVICE_SETTING_PASSPHRASE_ENTER;
@@ -566,6 +566,18 @@ int8_t GuiDevSettingNextTile(uint8_t tileIndex)
         tile = lv_tileview_add_tile(g_deviceSetTileView.tileView, currentTile, 0, LV_DIR_HOR);
         GuiDuressPinRepeatPinWidget(tile);
         destructCb = GuiRepeatDuressPinDestruct;
+        strcpy_s(midLabel, sizeof(midLabel), _("duress_pin_title"));
+        break;
+    case DEVICE_SETTING_DURESS_PIN_MENU:
+        tile = lv_tileview_add_tile(g_deviceSetTileView.tileView, currentTile, 0, LV_DIR_HOR);
+        GuiDuressPinMenuWidget(tile);
+        destructCb = GuiDuressPinMenuDestruct;
+        strcpy_s(midLabel, sizeof(midLabel), _("duress_pin_title"));
+        break;
+    case DEVICE_SETTING_DURESS_PIN_CONFIRM:
+        tile = lv_tileview_add_tile(g_deviceSetTileView.tileView, currentTile, 0, LV_DIR_HOR);
+        GuiDuressPinConfirmWidget(tile);
+        destructCb = GuiDuressPinConfirmDestruct;
         strcpy_s(midLabel, sizeof(midLabel), _("duress_pin_title"));
         break;
 

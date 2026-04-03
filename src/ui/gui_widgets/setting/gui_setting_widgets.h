@@ -45,6 +45,8 @@ typedef enum {
     DEVICE_SETTING_DURESS_PIN,
     DEVICE_SETTING_DURESS_PIN_VERIFY,
     DEVICE_SETTING_DURESS_PIN_SETPIN,
+    DEVICE_SETTING_DURESS_PIN_MENU,
+    DEVICE_SETTING_DURESS_PIN_CONFIRM,
 
     // PASSPHRASE
     DEVICE_SETTING_PASSPHRASE,
@@ -179,6 +181,12 @@ void GuiRepeatDuressPinDestruct(void *obj, void *param);
 void GuiSetDuressPasswordSuccess(void);
 void GuiSetDuressPasswordFail(void *param);
 bool GuiIsDuressFlowActive(void);
+void GuiDuressPinMenuWidget(lv_obj_t *parent);
+void GuiDuressPinMenuDestruct(void *obj, void *param);
+void GuiDuressPinConfirmWidget(lv_obj_t *parent);
+void GuiDuressPinConfirmDestruct(void *obj, void *param);
+void GuiDuressPinConfirmResult(const char *buf);
+bool GuiIsDuressConfirmActive(void);
 
 // set passphrase
 void GuiWalletPassphrase(lv_obj_t *parent);
