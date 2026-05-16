@@ -76,8 +76,6 @@ static lv_obj_t *g_noticeWindow = NULL;
 static lv_obj_t *g_noticeHintBox = NULL;
 static uint8_t g_entropyMethod;
 static PageWidget_t *g_pageWidget;
-static void SelectParseCntHandler(lv_event_t *e);
-static void SelectCheckBoxHandler(lv_event_t* e);
 
 static void ShareUpdateTileHandler(lv_event_t *e)
 {
@@ -123,13 +121,9 @@ void GuiCreateShareUpdateMnemonic(void *signalParam, uint16_t paramLen)
     ArrayRandom(SecretCacheGetSlip39Mnemonic(g_createShareTileView.currentSlice), g_randomBuff, g_selectCnt);
     GuiUpdateMnemonicKeyBoard(g_shareConfirmTile.keyBoard, g_randomBuff, true);
     GuiStopCircleAroundAnimation();
-    if (g_pageWidget != NULL && g_createShareTileView.currentTile == CREATE_SHARE_BACKUPFROM) {
-        _Static_assert(SLIP39_MNEMONIC_WORDS_MAX <= 255, "max mnemonic words <= 255");
-        char buf[4];
-        snprintf_s(buf, sizeof(buf), "%d", g_selectCnt);
-        SetRightBtnLabel(g_pageWidget->navBarWidget, NVS_BAR_WORD_SELECT, buf);
-        SetRightBtnCb(g_pageWidget->navBarWidget, SelectParseCntHandler, NULL);
-    }
+    // New SLIP 39 wallets are always created with 33-word shares (256-bit master
+    // secret) so that all coins, including Zcash, are usable on the resulting
+    // wallet. 20-word shares remain supported for recovery/import only.
 }
 
 static void StopCreateViewHandler(lv_event_t *e)
@@ -468,13 +462,6 @@ int8_t GuiCreateShareNextTile(const char *passphrase)
         break;
     case CREATE_SHARE_CUSTODIAN:
         lv_obj_clear_flag(g_shareBackupTile.nextCont, LV_OBJ_FLAG_HIDDEN);
-        if (g_createShareTileView.currentSlice == 0) {
-            _Static_assert(SLIP39_MNEMONIC_WORDS_MAX <= 255, "max mnemonic words <= 255");
-            char buf[4];
-            snprintf_s(buf, sizeof(buf), "%d", g_selectCnt);
-            SetRightBtnLabel(g_pageWidget->navBarWidget, NVS_BAR_WORD_SELECT, buf);
-            SetRightBtnCb(g_pageWidget->navBarWidget, SelectParseCntHandler, NULL);
-        }
         break;
     case CREATE_SHARE_BACKUPFROM:
         SetRightBtnLabel(g_pageWidget->navBarWidget, NVS_BAR_WORD_RESET, _("single_phrase_reset"));
@@ -567,11 +554,8 @@ void GuiCreateShareRefresh(void)
         SetNavBarLeftBtn(g_pageWidget->navBarWidget, NVS_BAR_RETURN, CloseCurrentViewHandler, NULL);
     } else if (g_createShareTileView.currentTile == CREATE_SHARE_BACKUPFROM) {
         SetNavBarLeftBtn(g_pageWidget->navBarWidget, NVS_BAR_CLOSE, StopCreateViewHandler, NULL);
-        _Static_assert(SLIP39_MNEMONIC_WORDS_MAX <= 255, "max mnemonic words <= 255");
-        char buf[4];
-        snprintf_s(buf, sizeof(buf), "%d", g_selectCnt);
-        SetRightBtnLabel(g_pageWidget->navBarWidget, NVS_BAR_WORD_SELECT, buf);
-        SetRightBtnCb(g_pageWidget->navBarWidget, SelectParseCntHandler, NULL);
+        // No word-count selector: new SLIP 39 wallets are 33-word only (see
+        // GuiCreateShareUpdateMnemonic). 20-word recovery still works via import.
     } else if (g_createShareTileView.currentTile == CREATE_SHARE_CONFIRM) {
         SetNavBarLeftBtn(g_pageWidget->navBarWidget, NVS_BAR_CLOSE, StopCreateViewHandler, NULL);
         SetNavBarRightBtn(g_pageWidget->navBarWidget, NVS_BAR_WORD_RESET, ResetBtnHandler, NULL);
@@ -582,102 +566,4 @@ void GuiCreateShareRefresh(void)
         SetMidBtnLabel(g_pageWidget->navBarWidget, NVS_BAR_MID_LABEL, _("Passphrase"));
     }
     SetNavBarMidBtn(g_pageWidget->navBarWidget, NVS_MID_BUTTON_BUTT, NULL, NULL);
-}
-
-static void SelectParseCntHandler(lv_event_t *e)
-{
-    static uint32_t currentIndex = 0;
-    lv_obj_t *checkBox = NULL;
-    lv_obj_t *checkedCheckBox = NULL;
-    lv_obj_t *desc = NULL;
-
-    GUI_DEL_OBJ(g_noticeHintBox)
-    g_noticeHintBox = GuiCreateHintBox(350);
-    lv_obj_add_event_cb(lv_obj_get_child(g_noticeHintBox, 0), CloseHintBoxHandler, LV_EVENT_CLICKED, &g_noticeHintBox);
-    lv_obj_t *label = GuiCreateIllustrateLabel(g_noticeHintBox, _("single_phrase_word_amount_select"));
-    lv_obj_align(label, LV_ALIGN_DEFAULT, 36, 492);
-    lv_obj_set_style_text_opa(label, LV_OPA_60, LV_PART_MAIN);
-    lv_obj_t *button = GuiCreateImgButton(g_noticeHintBox, &imgClose, 36, CloseHintBoxHandler, &g_noticeHintBox);
-    lv_obj_align(button, LV_ALIGN_DEFAULT, 407, 482);
-
-    if (g_selectCnt == SLIP39_MNEMONIC_33_WORDS) {
-        checkBox = GuiCreateSingleCheckBox(g_noticeHintBox, _("wallet_phrase_20words"));
-        lv_obj_align(checkBox, LV_ALIGN_DEFAULT, 30, 562);
-        desc = GuiCreateIllustrateLabel(g_noticeHintBox, _("shamir_20words_desc"));
-        lv_obj_set_style_text_opa(desc, LV_OPA_60, LV_PART_MAIN);
-        lv_obj_align(desc, LV_ALIGN_DEFAULT, 66, 600);
-        checkBox = GuiCreateSingleCheckBox(g_noticeHintBox, _("wallet_phrase_33words"));
-        lv_obj_align(checkBox, LV_ALIGN_DEFAULT, 30, 636);
-        lv_obj_add_state(checkBox, LV_STATE_CHECKED);
-        checkedCheckBox = checkBox;
-        desc = GuiCreateIllustrateLabel(g_noticeHintBox, _("shamir_33words_desc"));
-        lv_obj_set_style_text_opa(desc, LV_OPA_60, LV_PART_MAIN);
-        lv_obj_align(desc, LV_ALIGN_DEFAULT, 66, 674);
-    } else {
-        checkBox = GuiCreateSingleCheckBox(g_noticeHintBox, _("wallet_phrase_20words"));
-        lv_obj_align(checkBox, LV_ALIGN_DEFAULT, 30, 562);
-        lv_obj_add_state(checkBox, LV_STATE_CHECKED);
-        checkedCheckBox = checkBox;
-        desc = GuiCreateIllustrateLabel(g_noticeHintBox, _("shamir_20words_desc"));
-        lv_obj_set_style_text_opa(desc, LV_OPA_60, LV_PART_MAIN);
-        lv_obj_align(desc, LV_ALIGN_DEFAULT, 66, 600);
-        checkBox = GuiCreateSingleCheckBox(g_noticeHintBox, _("wallet_phrase_33words"));
-        lv_obj_align(checkBox, LV_ALIGN_DEFAULT, 30, 636);
-        desc = GuiCreateIllustrateLabel(g_noticeHintBox, _("shamir_33words_desc"));
-        lv_obj_set_style_text_opa(desc, LV_OPA_60, LV_PART_MAIN);
-        lv_obj_align(desc, LV_ALIGN_DEFAULT, 66, 674);
-    }
-
-    currentIndex = lv_obj_get_index(checkedCheckBox);
-    lv_obj_add_event_cb(g_noticeHintBox, SelectCheckBoxHandler, LV_EVENT_CLICKED, &currentIndex);
-}
-
-static void SelectCheckBoxHandler(lv_event_t* e)
-{
-    Slip39Data_t slip39 = {
-        .threShold = g_selectSliceTile.memberThreshold,
-        .memberCnt = g_selectSliceTile.memberCnt,
-    };
-    uint32_t *active_id = lv_event_get_user_data(e);
-    lv_obj_t *actCb = lv_event_get_target(e);
-    lv_obj_t *oldCb = lv_obj_get_child(g_noticeHintBox, *active_id);
-
-    if (actCb == g_noticeHintBox || oldCb == NULL || !lv_obj_check_type(actCb, &lv_checkbox_class)) {
-        return;
-    }
-    Vibrate(SLIGHT);
-    lv_obj_clear_state(oldCb, LV_STATE_CHECKED);
-    lv_obj_add_state(actCb, LV_STATE_CHECKED);
-    *active_id = lv_obj_get_index(actCb);
-
-    //TODO: use id to identity position
-    const char *currText = lv_checkbox_get_text(actCb);
-    if (!strcmp(currText, _("wallet_phrase_20words"))) {
-        SetRightBtnLabel(g_pageWidget->navBarWidget, NVS_BAR_WORD_SELECT, "20");
-        SetRightBtnCb(g_pageWidget->navBarWidget, SelectParseCntHandler, NULL);
-        if (g_selectCnt != 20) {
-            g_selectCnt = 20;
-            slip39.wordCnt = g_selectCnt;
-            if (g_entropyMethod == 0) {
-                GuiModelSlip39UpdateMnemonic(slip39);
-            } else {
-                GuiModelSlip39UpdateMnemonicWithDiceRolls(slip39);
-            }
-        }
-    } else if (!strcmp(currText, _("wallet_phrase_33words"))) {
-        SetRightBtnLabel(g_pageWidget->navBarWidget, NVS_BAR_WORD_SELECT, "33");
-        SetRightBtnCb(g_pageWidget->navBarWidget, SelectParseCntHandler, NULL);
-        if (g_selectCnt != 33) {
-            g_selectCnt = 33;
-            slip39.wordCnt = g_selectCnt;
-            if (g_entropyMethod == 0) {
-                GuiModelSlip39UpdateMnemonic(slip39);
-            } else {
-                GuiModelSlip39UpdateMnemonicWithDiceRolls(slip39);
-            }
-        }
-    }
-    lv_obj_clear_flag(g_pageWidget->navBarWidget->rightBtn, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_scroll_to_y(g_shareBackupTile.keyBoard->cont, 0, LV_ANIM_ON);
-    GUI_DEL_OBJ(g_noticeHintBox)
 }
