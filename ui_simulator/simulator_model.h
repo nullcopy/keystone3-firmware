@@ -44,6 +44,7 @@ void OTP_PowerOn(void);
 void random_buffer(uint8_t *buf, size_t len);
 bool IsPreviousLockScreenEnable(void);
 void SetLockScreen(bool enable);
+bool NeedUpdateBoot(void);
 
 extern bool g_reboot;
 
@@ -99,6 +100,20 @@ extern bool g_reboot;
     { \
         REMAPVIEW_TRX, \
         PC_SIMULATOR_PATH "/page_trx.json", \
+        GuiGetTrxData, \
+        NULL, \
+        FreeTrxMemory, \
+    }, \
+    { \
+        REMAPVIEW_TRX_PERSONAL_MESSAGE, \
+        PC_SIMULATOR_PATH "/page_trx_person.json", \
+        GuiGetTrxPersonalMessage, \
+        GetTrxPersonalMessageType, \
+        FreeTrxMemory, \
+    }, \
+    { \
+        REMAPVIEW_TRX_SWAP, \
+        PC_SIMULATOR_PATH "/page_trx_swap.json", \
         GuiGetTrxData, \
         NULL, \
         FreeTrxMemory, \
