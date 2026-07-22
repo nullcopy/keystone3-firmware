@@ -2044,6 +2044,39 @@ mod tests {
         assert!(signed.ironwood().actions().is_empty());
     }
 
+    /// Preserving the request's encoding must not invert the default: a v2
+    /// request still gets a v2 response, through both check and sign.
+    ///
+    /// `test_check_pczt_normalizes_and_is_idempotent` already pins the v2 check
+    /// output; this covers the signing response, which is what the wallet
+    /// actually parses, and guards the v1 echo against regressing into "always
+    /// emit v1".
+    #[test]
+    fn test_v2_pczt_request_keeps_v2_response() {
+        let sample = pczt::test_support::sample_orchard_change_pczt();
+        assert_eq!(&sample.bytes[..8], b"PCZT\x02\0\0\0");
+
+        let normalized = check_pczt_cypherpunk(
+            &MainNetwork,
+            &sample.bytes,
+            &sample.ufvk_text,
+            &sample.seed_fingerprint,
+            0,
+        )
+        .unwrap();
+        assert_eq!(&normalized[..8], b"PCZT\x02\0\0\0");
+
+        let signed = sign_checked_pczt(
+            &MainNetwork,
+            &normalized,
+            &sample.seed,
+            &sample.seed_fingerprint,
+            0,
+        )
+        .unwrap();
+        assert_eq!(&signed[..8], b"PCZT\x02\0\0\0");
+    }
+
     #[test]
     fn test_parse_ignores_and_check_rejects_unsupported_ironwood_spend_zip32_path() {
         let sample = pczt::test_support::sample_ironwood_pczt();
